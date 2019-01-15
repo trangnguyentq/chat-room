@@ -1,0 +1,21 @@
+{
+  "name": "qtrangnguyen-fall2016-module6-quoc-nguyen-445516-trang-nguyen-445396-f30ea7faa341",
+  "version": "1.0.0",
+  "description": "Trang Nguyen - 445396 Quoc Nguyen - 445516",
+  "main": "chat_server.js",
+  "dependencies": {
+    "mime": "^2.3.1",
+    "mine": "^0.1.0",
+    "mocha": "^5.2.0",
+    "mongoose": "^5.3.9",
+    "nodemon": "^1.18.6",
+    "socket.io": "^2.1.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node chat_server.js"
+  },
+  "author": "",
+  "license": "ISC"
+}

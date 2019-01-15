@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<style>
+		body {
+			padding: 0;
+			margin: 0;
+			color: #555;
+			font-family: Open Sans;
+			font-size: 16px;
+			position: relative;
+			height: 100vh;
+			font-weight: 400;
+		}
+
+		button {
+			font-family: inherit;
+			font-size: 100%;
+			margin: 0;
+		}
+
+		button {
+			line-height: normal;
+		}
+
+		button:hover {
+			background-color: #778899;
+		}
+
+		#chatRoom {
+			display: none;
+			padding-left: 3%;
+			float: left;
+			width: 60%;
+		}
+
+		#roomList {
+			display: none;
+			padding-left: 1%;
+			padding-right: 2% background-color: FFFFF0;
+			float: left;
+			width: 35%;
+			/*background-color: #f7f7f7;*/
+
+		}
+
+		.secret {
+			color: purple;
+			font-style: italic;
+		}
+
+		#memberOnline {
+			float: left;
+			width: 35%;
+			border-color: blue;
+		}
+
+		#full_room {
+			float: right;
+			width: 65%;
+		}
+
+		#chatlog {
+			height: 100vh;
+			overflow: auto;
+			border: 3px solid #C0C0C0;
+			background-color: #fff;
+			color: inherit;
+			font-family: inherit;
+			font-size: 14px;
+			padding: 12px 15px;
+			margin-right: 10px;
+			border-radius: 5px;
+			transition: border 0.3s;
+		}
+
+		#nickName {
+			background: #fff;
+			max-width: 500px;
+			margin: 50px auto;
+			padding: 2rem;
+			border: 2px solid #000;
+			width: 100%;
+			text-align: center;
+		}
+
+		#user_text {
+			font-family: Comic Sans MS;
+			font-size: 1.5rem;
+
+		}
+
+		ul {
+			list-style-type: none;
+			padding-left: 0;
+			height: 100vh;
+			border-top: 2px solid #000;
+		}
+
+		li {
+			border-bottom: 2px solid #000;
+			padding: 5% 5% 5% 5%;
+		}
+
+		#chat_log_error,
+		#ban_remove_error,
+		#connect_room_error,
+		#create_room_error {
+			color: red;
+			font-style: italic;
+
+		}
+	</style>
+	<link rel="stylesheet" href="/style.css">
+	<title>Chat Room</title>
+	<link rel="stylesheet" type="text/css" href="chatroom.css">
+	<script src="/socket.io/socket.io.js"></script>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+	<script type="text/javascript" src="room.js"></script>
+	<script type="text/javascript">
+
+		var socketio = io.connect();
+
+		socketio.on("message_to_client", function (data) {
+			//Append an HR thematic break and the escaped HTML of the new message
+			$("#chatlog").append("<b>" + data['usern'] + ": </b>" + data['message'] + "<br>");
+
+
+		});
+
+		socketio.on("secret_message_to_client", function (data) {
+			//Append an HR thematic break and the escaped HTML of the new message
+			$("#chatlog").append("<span class = 'secret'><i>From <b>" + data.usern + "</b> secretly to <b>" + data.receiver + ":</b><i> " + data['message'] + "</span><br>");
+		});
+
+		socketio.on("hide_ban_and_remove", function (data) {
+			//hide ban and remove section if user is not admin of the room
+			$("#ban_and_remove").html("");
+		});
+
+		socketio.on("welcome_to_page", function (data) {
+			//display welcome message to each user
+			$("#Welcome_to_chat").html("<h1>Welcome, " + data.myself + "</h1>");
+		});
+
+		socketio.on("user_to_client", function (data) {
+			//display member online in the entire page
+			var userlist = "<b>Online member(s):</b><br> ";
+			var list = data["user"];
+			for (i = 0; i < list.length; i++) {
+				userlist += list[i] + '<br> ';
+			}
+			$("#memberOnline").html(userlist);
+		});
+
+		socketio.on("ban_and_remove", function (data) {
+			//ban and remove appear when you are the creator of the room
+			$("#ban_and_remove").html("<span>Ban user from chat room: </span><input type='text' id='user_to_ban'/> <button onclick='banUser()'>Ban</button><br><span>Remove user from chat room: </span><input type='text' id='user_to_remove'/> <button onclick='removeUser()'>Remove</button>");
+		});
+
+		socketio.on("you_are_banned", function (data) {
+			//when someone is banned, kick they out of the room
+			$("#chatRoom").hide();
+		});
+
+		socketio.on("you_are_removed", function (data) {
+			//when someone is remove, kick they out of the room
+			$("#chatRoom").hide();
+		});
+
+		socketio.on("open_room_to_client", function (data) {
+			//display the room that currently open to user
+			var display_room = "";
+			var room_list = data.room_list;
+			for (i = 0; i < room_list.length; i++) {
+				if (room_list[i].privatebool) {
+					display_room += "<li>Private: <b>" + room_list[i].name + "</b><br><span>Password: </span><input type='password' id='room_pass_val'/><button type='button' class ='join'>Join</button><input type = 'hidden' class = 'info_of_room' value = '" + room_list[i].name + "'/><input type = 'hidden' class = 'roomt' value = 'Private'/></li>";
+				} else {
+					display_room += "<li>Public: <b>" + room_list[i].name + "</b><br><button type='button' class ='join'>Join</button><input type = 'hidden' class = 'info_of_room' value = '" + room_list[i].name + "'/><input type = 'hidden' class = 'roomt' value = 'Public'/> </li>";
+				}
+			}
+			$("#display_room").html(display_room);
+		});
+
+		socketio.on("member_in_chatroom", function (data) {
+			//display members in each chat room
+			var userlist = "<i><b>Member(s) in room:</i></b> ";
+			var list = data.people;
+			for (i = 0; i < list.length; i++) {
+				userlist += list[i] + '; ';
+			}
+			$("#memberList").html(userlist);
+
+		});
+
+		socketio.on("error_message", function (data) {
+			$("#connect_room_error").html(data);
+		});
+
+		socketio.on("error_message_log", function (data) {
+			$("#chat_log_error").html(data);
+		});
+
+		socketio.on("error_remove_user", function (data) {
+			$("#ban_remove_error").html(data);
+		});
+
+		socketio.on("ban_message", function (data) {
+			$("#connect_room_error").html("You are permanently banned from " + data.name);
+		});
+
+		socketio.on("delete_room", function (data) {
+			//delete room button only appear when you are the creator of the room
+			$("#delete_room").html("<button onclick='deleteRoom()'>Delete Room</button>");
+		});
+
+		socketio.on("hide_delete_room", function (data) {
+			//hide delete room if you are not the creator of the room
+			$("#delete_room").html("");
+		});
+		/*
+		socketio.on("change_background_now", function(data) {
+			//$("#chatlog").append("<b>" + data.usern + ": </b><br><img src = '" + data.url + "' max-width: 100px ><br>");
+			$("#chatlog").css('background-image', 'url('+ data.url +')');
+		});*/
+
+		$(document).on('click', '#roomList #display_room li .join', function () {
+			//when the button join is clicked, the user enter the room if they are not banned from the room
+			$("#ban_remove_error").html("");
+			$("#chat_log_error").html("");
+			$("#create_room_error").html("");
+			$("#connect_room_error").html("");
+			var room_name = $(this).parent().find(".info_of_room").val();
+			var roomType = $(this).parent().find(".roomt").val();
+			var roomPass = "";
+			if (roomType == "Private") {
+				roomPass = $(this).parent().find("#room_pass_val").val();
+			}
+			//alert(room_name);
+			socketio.emit("join_room", { name: room_name, pass: roomPass }, function (data) {
+				$("#chatRoom").show();
+				$("#welcome_message").html("<h1> Welcome to chat room: <b>" + data.name + "</b></h1>");
+				$("#chatlog").html("");
+			});
+
+		});
+
+		$(document).on('click', '#roomList #display_room li .delete', function () {
+			//when creator delete room, the room disappear from room list and everyone is currently in the room is kicked out
+			$("#ban_remove_error").html("");
+			$("#chat_log_error").html("");
+			$("#create_room_error").html("");
+			$("#connect_room_error").html("");
+			var room_name = $(this).parent().find(".info_of_room").val();
+
+			socketio.emit("delete_room", room_name, function (data) {
+				$("#chatRoom").show();
+				$("#welcome_message").html("<h1> Welcome to chat room: <b>" + data.name + "</b></h1>");
+				$("#chatlog").html("");
+			});
+		});
+
+		function deleteRoom() {
+			//detele room
+			$("#ban_remove_error").html("");
+			$("#chat_log_error").html("");
+			$("#create_room_error").html("");
+			$("#connect_room_error").html("");
+			socketio.emit("delete_this_room", "");
+		}
+
+		function banUser() {
+			//ban user
+			$("#ban_remove_error").html("");
+			$("#chat_log_error").html("");
+			$("#create_room_error").html("");
+			$("#connect_room_error").html("");
+			var user_to_ban = $("#user_to_ban").val();
+			socketio.emit("ban_user", user_to_ban);
+			$("#user_to_ban").val('').removeAttr('checked').removeAttr('selected');
+		}
+
+
+		function removeUser() {
+			//remove user
+			$("#ban_remove_error").html("");
+			$("#chat_log_error").html("");
+			$("#create_room_error").html("");
+			$("#connect_room_error").html("");
+			var user_to_remove = $("#user_to_remove").val();
+			socketio.emit("remove_user_from_room", user_to_remove);
+			$("#user_to_remove").val('').removeAttr('checked').removeAttr('selected');
+		}
+
+		function sendMessage() {
+			//send message to all user in room
+			$("#ban_remove_error").html("");
+			$("#chat_log_error").html("");
+			$("#create_room_error").html("");
+			$("#connect_room_error").html("");
+			var msg = $("#message_input").val();
+
+			//var msg = document.getElementById("message_input").value;
+			if (msg !== '') {
+				socketio.emit("message_to_server", { message: msg });
+			} else {
+				$("#chat_log_error").html("Please enter a valid message!");
+			}
+
+			$("#message_input").val('').removeAttr('checked').removeAttr('selected');
+
+		}
+
+		function sendMessageSecret() {
+			//send to one member secretly
+			$("#ban_remove_error").html("");
+			$("#chat_log_error").html("");
+			$("#create_room_error").html("");
+			$("#connect_room_error").html("");
+			var msg = $("#message_secret").val();
+			var to_person = $("#secret_to").val();
+			//var msg = document.getElementById("message_input").value;
+			if (msg !== '') {
+				socketio.emit("message_to_server_secret", { message: msg, receiver: to_person });
+			} else {
+				$("#chat_log_error").html("Please enter a valid message!");
+
+			}
+
+			$("#message_secret").val('').removeAttr('checked').removeAttr('selected');
+			$("#secret_to").val('').removeAttr('checked').removeAttr('selected');
+		}
+
+		function setUsername() {
+			//enter a username and enter the chat page
+			var name = $("#nick").val();
+			//alert(name);
+			if (name !== '') {
+				socketio.emit("send_user_server", { username: name }, function (data) {
+					if (data) {
+						$("#nickName").hide();
+						$("#roomList").show();
+						//$("#chatRoom").show();
+					} else {
+						$("#set_nick_error").html("Username already exits. Choose another one.");
+					}
+				});
+			} else {
+				$("#set_nick_error").html("Please enter a valid username!");
+			}
+		}
+
+		function displayPassword() {
+			//if the room is private, show a password space to enter
+			var roomType = $("#roomType option:selected").val();
+			if (roomType == "Private") {
+				$("#room_password").html("<span>Room Password: </span><input type='password' id='password_private'></input>");
+			} else {
+				$("#room_password").html("");
+			}
+		}
+
+		function leaveRoom() {
+			//when user leave the room
+			socketio.emit("leave_this_room", "");
+		}
+		/*
+		function changeBackground() {
+			var background_url = $("#background_url").val();
+			//alert(background_url);
+			socketio.emit("change_background", background_url);
+		}*/
+
+		function createRoom() {
+			//when user create room
+			$("#ban_remove_error").html("");
+			$("#chat_log_error").html("");
+			$("#create_room_error").html("");
+			$("#connect_room_error").html("");
+			var room_name = $("#room_name").val();
+			var roomType = $("#roomType option:selected").val();
+			var roomPass = "";
+			if (roomType == "Private") {
+				roomPass = $("#password_private").val();
+			}
+			//alert(room_name);
+			if ((room_name !== '' && roomType === 'Public') || (roomPass !== '' && room_name !== '' && roomType === 'Private')) {
+				socketio.emit("create_room", { roomname: room_name, roomType: roomType, password: roomPass }, function (data) {
+
+					if (data.bool) {
+						$("#chatRoom").show();
+						$("#welcome_message").html("<h1> Welcome to chat room: <b>" + data.room.name + "</b></h1>");
+						$("#chatlog").html("");
+					} else {
+						$("#create_room_error").html("Room name already exits. Please choose another name.");
+						//$("#chatRoom").show();
+					}
+				});
+
+			} else {
+				$("#create_room_error").html("Please enter a valid room name or password!");
+			}
+
+			$("#room_name").val('').removeAttr('checked').removeAttr('selected');
+		}
+
+	</script>
+</head>
+
+<body>
+	<div id="nickName">
+		<p id="user_text"> Enter a username: </p>
+		<input type='text' id='nick' />
+		<button onclick='setUsername()'>Submit</button>
+		<div id="set_nick_error"></div>
+	</div>
+
+	<div id="roomList">
+		<div id="Welcome_to_chat"></div>
+		<div id=roomList_content>
+			<div id="memberOnline"></div>
+			<div id="full_room">
+				<span>Room Name: </span><input type='text' id='room_name' /><br>
+				<span> Room Type: </span><select id="roomType" onchange="displayPassword()">
+					<option value="Public">Public</option>
+					<option value="Private">Private</option>
+				</select>
+				<div id="room_password"></div>
+				<div id="create_room_error"></div>
+				<button onclick='createRoom()'>Create Room</button>
+				<div id="connect_room_error"></div>
+
+				<ul id="display_room"></ul>
+			</div>
+		</div>
+	</div>
+
+	<div id="chatRoom">
+		<div id="welcome_message"></div>
+		<div id="memberList"></div>
+		<div id="ban_and_remove"></div>
+		<div id="chatBox">
+			<!--<span>Background image url: </span><input type="text" id="background_url"/> <button onclick="changeBackground()">Change</button>-->
+			<span>Secret message: </span><input type="text" id="message_secret" /> to <input type="text" id="secret_to"
+			 placeholder="username" />
+			<button onclick="sendMessageSecret()">Send secretly</button>
+			<br>
+			<span>Public message: </span><input type="text" id="message_input" />
+			<button onclick="sendMessage()">Send</button>
+			<div id="chat_log_error"></div>
+			<div id="ban_remove_error"></div>
+			<div id="chatlog"></div>
+		</div>
+		<button onclick="leaveRoom()" style="float: right">Leave Room</button>
+		<div style="float: right" id="delete_room"></div>
+	</div>
+
+</body>
+
+</html>
